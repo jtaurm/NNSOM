@@ -27,6 +27,7 @@ import java.text.DecimalFormat;
 import java.text.NumberFormat;
 import java.util.LinkedList;
 import java.util.ArrayList;
+import java.util.Arrays;
 
 /**
  *
@@ -124,6 +125,9 @@ public class SelfOrganizingMap_arr_hc_toroid
         {
             for(int h = 0; h < Neuron_matrix_height; h++)
             {
+                if(Neuron_matrix_hits[w][h] == -1)
+                    continue;
+                
                 double distance = 0d;
 
                 for(int d = 0; d < Neuron_matrix_depth; d++)
@@ -193,8 +197,9 @@ public class SelfOrganizingMap_arr_hc_toroid
     {
         NumberFormat format7d = new DecimalFormat("#0.0000000");
         
+        Double[][] trainingData = TrainingData.GetNormalizedDataSetAsArray();
+        
         int rowCount = TrainingData.GetRowCount();
-        int rowCount_train = (int) ((double) rowCount * rowCount_rate);
         int trainCount = 0;
         
         Double mse_avg_log;
@@ -208,8 +213,9 @@ public class SelfOrganizingMap_arr_hc_toroid
         {   // For each radius down to 0
             
             // Train
-            mse_last.add( Train(1, rowCount_train, learning_rate, coop_radius ) );
-            trainCount++;
+            //mse_last.add( Train_CV(10, learning_rate, coop_radius ) );
+            mse_last.add( Train_MonteCarlo(trainingData, 1, rowCount, learning_rate, coop_radius ) );
+            trainCount += 1;
             
             if(verbose) System.out.print("|");
             
@@ -247,8 +253,13 @@ public class SelfOrganizingMap_arr_hc_toroid
                     mse_final = mse_last.getLast();
                     mse_last.clear();
                     trainCount = 0;
+                    
+                    if(coop_radius == 0) // clear for last round
+                        ResetHits();
                 }
             }
+            
+            
         }
         
         return mse_final;
@@ -261,13 +272,15 @@ public class SelfOrganizingMap_arr_hc_toroid
     private final int[] walk_r1_u_w = new int[] { 1,  0, -1, -1, 1, 1 };
     private final int[] walk_r1_u_h = new int[] { 0, -1,  0,  1, 1, 0 };
     
-    public double Train(int repCount, int duration, double learningRate, int coop_radius )
+    public double Train_MonteCarlo(Double[][] trainingData, int repCount, int duration, double learningRate, int coop_radius )
     {
-        int TableWidth = TrainingData.GetTableWidth();
         int rowCount = TrainingData.GetRowCount();
                 
-        double training_error = 0;
-        int training_count = 0;
+        double training_error = 0d;
+        double test_error = 0d;
+        
+        int[] test_indices;
+        int test_count = (int)((double)rowCount / 10);
         
         for(int rep = 0; rep < repCount; rep++)
         {
@@ -284,112 +297,129 @@ public class SelfOrganizingMap_arr_hc_toroid
                 idx_order[i] = idx_order[p];
                 idx_order[p] = swap;
             }
+            
+            test_indices = Arrays.copyOf(idx_order, test_count);
                     
-            // Iterate over time - just indices
-            for(int t = 0; t < duration; t++)
+            // Train single session
+            training_error += Train_SingleSession( idx_order, learningRate, coop_radius, trainingData);
+            test_error += PredictionMSE(test_indices, trainingData);
+            
+        }
+        
+        return test_error / repCount;
+        
+    }
+    
+    public double Train_SingleSession(int[] idx_order, double learningRate, int coop_radius, Double[][] trainingData )
+    {
+        int TableWidth = trainingData.length;
+                
+        double training_error = 0;
+        int training_count = 0;
+
+        // Iterate over time - just indices
+        for(int t = 0; t < idx_order.length; t++)
+        {
+            // Get sample row
+            int row = idx_order[t];
+            Double[] x = new Double[ TableWidth ];
+            for(int c = 0; c < TableWidth; c++)
+                x[c] = trainingData[c][row];
+
+            // Calc local learning rate
+            double learningRate_t = learningRate;// * (1 - (t / idx_order.length) );
+
+            // Find best matching unit
+            int[] bmu_coords = FindBestMatchingUnit(x);
+            int bmu_w = bmu_coords[0];
+            int bmu_h = bmu_coords[1];
+
+            Neuron_matrix_hits[ bmu_w ][ bmu_h ]++;
+
+            // Update BMU - neighbourhood distance is 0
+
+            // bmu.Update(learningRate_t, 1d, x);
+            // m(i + 1) = m(i) + a(t) * Neighbourhood( c, i ) * ( x - m(i))
+
+            double neighbourhood_dist = 1d;
+
+            for(int d = 0; d < Neuron_matrix_depth; d++)
             {
-                // Get sample row
-                int row = idx_order[t];
-                Double[] x = new Double[ TableWidth ];
-                for(int c = 0; c < TableWidth; c++)
-                    x[c] = TrainingData.GetCellValueNormalized(c, row);
-                
-                // Calc local learning rate
-                double learningRate_t = learningRate * (1 - (t / duration) );
-                
-                // Find best matching unit
-                int[] bmu_coords = FindBestMatchingUnit(x);
-                int bmu_w = bmu_coords[0];
-                int bmu_h = bmu_coords[1];
-                
-                Neuron_matrix_hits[ bmu_w ][ bmu_h ]++;
-                
-                // Update BMU - neighbourhood distance is 0
-                
-                // bmu.Update(learningRate_t, 1d, x);
-                // m(i + 1) = m(i) + a(t) * Neighbourhood( c, i ) * ( x - m(i))
-                
-                double neighbourhood_dist = 1d;
-                
-                for(int d = 0; d < Neuron_matrix_depth; d++)
+                if( !x[d].isNaN() )
                 {
-                    if( !x[d].isNaN() )
-                    {
-                        Neuron_matrix_gradients[bmu_w][bmu_h][d] = learningRate_t * neighbourhood_dist * ( x[d] - Neuron_matrix_weights[bmu_w][bmu_h][d] );
-                        Neuron_matrix_weights[bmu_w][bmu_h][d] = Neuron_matrix_weights[bmu_w][bmu_h][d] + Neuron_matrix_gradients[bmu_w][bmu_h][d];
-                    }
-                    else // If unknown, do as last time
-                    {
-                        Neuron_matrix_weights[bmu_w][bmu_h][d] = Neuron_matrix_weights[bmu_w][bmu_h][d] + Neuron_matrix_gradients[bmu_w][bmu_h][d];
-                        Neuron_matrix_gradients[bmu_w][bmu_h][d] = 0d;
-                    }
-                    
-                    //if( Double.isInfinite(Neuron_matrix_weights[bmu_w][bmu_h][d]))
-                    //    System.out.println("wah");
+                    Neuron_matrix_gradients[bmu_w][bmu_h][d] = learningRate_t * neighbourhood_dist * ( x[d] - Neuron_matrix_weights[bmu_w][bmu_h][d] );
+                    Neuron_matrix_weights[bmu_w][bmu_h][d] = Neuron_matrix_weights[bmu_w][bmu_h][d] + Neuron_matrix_gradients[bmu_w][bmu_h][d];
                 }
-                
-                int u_h, u_w;
-                     
-                for(int r = 1; r < coop_radius; r++) 
-                {   // r is current radius
-                    u_h = bmu_h + r;
-                    u_w = bmu_w + r;
-                    
-                    for(int dir = 0; dir < 6; dir++) 
-                    {   // dir is current direction
-                        for(int w = 1; w <= r; w++) 
-                        {   // w is current walking dist
-                            
-                            // walk
-                            if( u_h % 2 == 0) 
-                            {   // even
-                                u_w = (u_w + walk_r1_e_w[dir] + Neuron_matrix_width) % Neuron_matrix_width;
-                                u_h = (u_h + walk_r1_e_h[dir] + Neuron_matrix_height) % Neuron_matrix_height;
-                            }
-                            else 
-                            {   // ueven
-                                u_w = (u_w + walk_r1_u_w[dir] + Neuron_matrix_width) % Neuron_matrix_width;
-                                u_h = (u_h + walk_r1_u_h[dir] + Neuron_matrix_height) % Neuron_matrix_height;
-                            }
-                            
-                            neighbourhood_dist = Neighbourhood( bmu_w, bmu_h, u_w, u_h, r);
-                            
-                            //System.out.println( "\tr:" + r + "\tw:" + w + "\tdir:"+dir+"\tu_w:"+u_w + "\tu_h:"+u_h);
-                            for(int d = 0; d < Neuron_matrix_depth; d++)
+                else // If unknown, do as last time
+                {
+                    Neuron_matrix_weights[bmu_w][bmu_h][d] = Neuron_matrix_weights[bmu_w][bmu_h][d] + Neuron_matrix_gradients[bmu_w][bmu_h][d];
+                    Neuron_matrix_gradients[bmu_w][bmu_h][d] = 0d;
+                }
+
+                //if( Double.isInfinite(Neuron_matrix_weights[bmu_w][bmu_h][d]))
+                //    System.out.println("wah");
+            }
+
+            int u_h, u_w;
+
+            for(int r = 1; r < coop_radius; r++) 
+            {   // r is current radius
+                u_h = bmu_h + r;
+                u_w = bmu_w + r;
+
+                for(int dir = 0; dir < 6; dir++) 
+                {   // dir is current direction
+                    for(int w = 1; w <= r; w++) 
+                    {   // w is current walking dist
+
+                        // walk
+                        if( u_h % 2 == 0) 
+                        {   // even
+                            u_w = (u_w + walk_r1_e_w[dir] + Neuron_matrix_width) % Neuron_matrix_width;
+                            u_h = (u_h + walk_r1_e_h[dir] + Neuron_matrix_height) % Neuron_matrix_height;
+                        }
+                        else 
+                        {   // ueven
+                            u_w = (u_w + walk_r1_u_w[dir] + Neuron_matrix_width) % Neuron_matrix_width;
+                            u_h = (u_h + walk_r1_u_h[dir] + Neuron_matrix_height) % Neuron_matrix_height;
+                        }
+
+                        neighbourhood_dist = Neighbourhood( bmu_w, bmu_h, u_w, u_h, r);
+
+                        //System.out.println( "\tr:" + r + "\tw:" + w + "\tdir:"+dir+"\tu_w:"+u_w + "\tu_h:"+u_h);
+                        for(int d = 0; d < Neuron_matrix_depth; d++)
+                        {
+                            //System.out.println( "\tr:" + r + "\tw:" + w + "\tdir:"+dir+"\td:" + d + "\tu_w:"+u_w + "\tu_h:"+u_h);
+                            if( !x[d].isNaN() )
                             {
-                                //System.out.println( "\tr:" + r + "\tw:" + w + "\tdir:"+dir+"\td:" + d + "\tu_w:"+u_w + "\tu_h:"+u_h);
-                                if( !x[d].isNaN() )
-                                {
-                                    Neuron_matrix_gradients[u_w][u_h][d] = learningRate_t * neighbourhood_dist * ( x[d] - Neuron_matrix_weights[u_w][u_h][d] );
-                                    Neuron_matrix_weights[u_w][u_h][d] = Neuron_matrix_weights[u_w][u_h][d] + Neuron_matrix_gradients[u_w][u_h][d];
-                                }
-                                else // If unknown, do as last time
-                                {
-                                    Neuron_matrix_weights[u_w][u_h][d] = Neuron_matrix_weights[u_w][u_h][d] + Neuron_matrix_gradients[u_w][u_h][d];
-                                    Neuron_matrix_gradients[u_w][u_h][d] = 0d;
-                                }
+                                Neuron_matrix_gradients[u_w][u_h][d] = learningRate_t * neighbourhood_dist * ( x[d] - Neuron_matrix_weights[u_w][u_h][d] );
+                                Neuron_matrix_weights[u_w][u_h][d] = Neuron_matrix_weights[u_w][u_h][d] + Neuron_matrix_gradients[u_w][u_h][d];
                             }
-                            
+                            else // If unknown, do as last time
+                            {
+                                Neuron_matrix_weights[u_w][u_h][d] = Neuron_matrix_weights[u_w][u_h][d] + Neuron_matrix_gradients[u_w][u_h][d];
+                                Neuron_matrix_gradients[u_w][u_h][d] = 0d;
+                            }
                         }
 
                     }
-                }
-                                 
-                // Collect BMU error
-                double errorSum = 0d;
-                int errorCount = 0;
 
-                for(int d = 0; d < TableWidth; d++)
-                    if(!x[d].isNaN())
-                    {
-                        errorSum += (Neuron_matrix_weights[bmu_w][bmu_h][d] - x[d])*(Neuron_matrix_weights[bmu_w][bmu_h][d] - x[d]);
-                        errorCount++;
-                    }
-                
-                training_error += errorSum;
-                training_count += errorCount;
+                }
             }
-            
+
+            // Collect BMU error
+            double errorSum = 0d;
+            int errorCount = 0;
+
+            for(int d = 0; d < TableWidth; d++)
+                if(!x[d].isNaN())
+                {
+                    errorSum += (Neuron_matrix_weights[bmu_w][bmu_h][d] - x[d])*(Neuron_matrix_weights[bmu_w][bmu_h][d] - x[d]);
+                    errorCount++;
+                }
+
+            training_error += errorSum;
+            training_count += errorCount;
         }
         
         return training_error / training_count;
@@ -435,6 +465,37 @@ public class SelfOrganizingMap_arr_hc_toroid
             }
         }
         return neuron_count;
+    }
+    
+    public double PredictionMSE(int[] indices, Double[][] trainingData)
+    {
+        double mse = 0d;
+        Double[] row_data = new Double[Neuron_matrix_depth];
+        double[] row_prediction;
+        for(int i = 0; i < indices.length; i++)
+        {
+            for(int c = 0; c < Neuron_matrix_depth; c++)
+                row_data[c] = trainingData[c][i];
+
+            row_prediction = Predict(i, trainingData);
+            
+            for(int c = 0; c < Neuron_matrix_depth; c++)
+                if(!row_data[c].isNaN())
+                    mse += Math.pow( row_prediction[c] - row_data[c], 2 );
+        }
+        return mse / ((double) indices.length);
+    }
+    
+    public double[] Predict(int row, Double[][] trainingData)
+    {
+        // Get sample row
+        Double[] x = new Double[ Neuron_matrix_depth ];
+        for(int c = 0; c < Neuron_matrix_depth; c++)
+            x[c] = trainingData[c][row];
+        
+        int[] bmu_coords = FindBestMatchingUnit(x);
+        
+        return Neuron_matrix_weights[ bmu_coords[0] ][ bmu_coords[1] ];
     }
     
     public double[] Predict(int row)

@@ -50,6 +50,8 @@ public abstract class Column
     abstract Double GetValue_Avg(int position);
     abstract Double GetValue_Var(int position);
     
+    abstract Double[] GetValues_Normalized(int position );
+    
     abstract public double DenormalizeValue( double value );
     abstract public double NormalizeValue( double value );
             

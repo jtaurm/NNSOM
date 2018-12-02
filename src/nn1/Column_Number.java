@@ -303,6 +303,14 @@ public class Column_Number extends Column
     }
     
     @Override
+    Double[] GetValues_Normalized( int position )
+    {
+        int row_count = GetRowCount();
+        Double[] arr = new Double[row_count];
+        return DataAsDoubleNorm.toArray(arr);
+    }
+    
+    @Override
     public Double GetValue_Numeric(int row, int position)
     {
         return DataAsDouble.get(row);

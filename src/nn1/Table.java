@@ -204,6 +204,22 @@ public class Table
         double avg = Column_list.get( ColumnIdx[0] ).GetValue_Avg( ColumnIdx[1] );
         return Column_list.get( ColumnIdx[0] ).NormalizeValue(avg);
     }
+    
+    public Double[][] GetNormalizedDataSetAsArray()
+    {
+        Double[][] DataSet_Norm = new Double[TableWidth][GetRowCount()];
+        
+        for(int c = 0; c < TableWidth; c++)
+        {
+            Integer[] ColumnIdx = Columns_PosToIdx.get(c);
+            Column col = Column_list.get( ColumnIdx[0] );
+            
+            DataSet_Norm[c] = col.GetValues_Normalized( ColumnIdx[1] );
+        }
+        
+        return DataSet_Norm;
+    }
+    
         
     public String[] ToCSVLines( boolean[] columnMap )
     {

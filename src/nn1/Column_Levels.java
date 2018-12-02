@@ -233,6 +233,18 @@ public class Column_Levels extends Column
     }
     
     @Override
+    Double[] GetValues_Normalized( int position )
+    {
+        int row_count = GetRowCount();
+        Double[] arr = new Double[row_count];
+        for(int r = 0; r < row_count; r++)
+        {
+            arr[r] = DataAsDouble.get(r)[position];
+        }
+        return arr;
+    }
+    
+    @Override
     public Double GetValue_Numeric(int row, int position)
     {
         return DataAsDouble.get(row)[position];
