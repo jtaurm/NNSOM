@@ -100,8 +100,7 @@ public class Nn1
                 System.out.print( pc[i] + ",");
             System.out.println();
         }
-        */
-        
+        */      
         // Test SOM
         
         TestKohonenMap( tData );
@@ -109,23 +108,38 @@ public class Nn1
         // Test NN
 
         TestNeuralNetwork( tData, predictors, columnIOMapping);
+        
+        
+        /*
+        // Seed function
+        
+        int seed = 538;
+        for(int s = 0; s < seed; s++)
+        {
+            for(int r = s; r < rowCount; r += seed)
+            {
+                System.out.print(r + " ");
+            }
+            System.out.println();
+        }
+        */
     }
     
-    public void TestNeuralNetwork_new( Table tData, ArrayList<Integer> response_var_idx, int[] columnIOMapping  )
+    public void TestNeuralNetwork( Table tData, ArrayList<Integer> response_var_idx, int[] columnIOMapping  )
     {
         int inputSize = columnIOMapping.length - response_var_idx.size();
         int outputSize = response_var_idx.size();
         
         double[][] training_data = tData.GetNormalizedDataSetAsArray_rc();
         
-        NeuralNetworl_feedforward_leakyReLu nn_test = new NeuralNetworl_feedforward_leakyReLu();
+        NeuralNetwork_feedforward_leakyReLu nn_test = new NeuralNetwork_feedforward_leakyReLu();
         
         nn_test.Initialize(inputSize, outputSize, 16, 4);
         
         System.out.println("Created NN w " + "many" + " neurons.");
         
         System.out.println("Training NN");
-        for(double learning_rate = 0.1; learning_rate > 0.0005; learning_rate *= 1 / Math.E )
+        for(double learning_rate = 0.1; learning_rate > 0.001; learning_rate *= 1 / Math.E )
             nn_test.Train(training_data, columnIOMapping, 100, learning_rate);
          
         // Predict
@@ -173,85 +187,7 @@ public class Nn1
         
     }
     
-    public void TestNeuralNetwork( Table tData, ArrayList<Integer> predictors, int[] columnIOMapping  )
-    {
-        int inputSize = tData.GetTableWidth() - predictors.size();
-        int outputSize = predictors.size();
-        
-        NeuralNetwork nn_test = new NeuralNetwork( );
-        nn_test.SetupSquare( inputSize, outputSize, 4, 16 );
-        //nn_test.SetupLogSize(inputSize, outputSize, Math.E );
-        
-        System.out.println("Created NN w " + nn_test.GetFeedOrder().size() + " neurons.");
-        
-        NeuralNetworkTrainer nn_trainer = new NeuralNetworkTrainer( nn_test );
-        nn_trainer.SetTrainingData( tData, columnIOMapping );
-        
-        System.out.println("Training NN");
-        
-        // Train
-        nn_trainer.Train_k(100, 0.1, 10);
-        nn_trainer.Train_k(100, 0.05, 10);
-        nn_trainer.Train_k(100, 0.01, 10);
-        nn_trainer.Train_k(100, 0.006, 10);
-        nn_trainer.Train_k(100, 0.003, 10);
-        nn_trainer.Train_k(100, 0.002, 10);
-        nn_trainer.Train_k(100, 0.001, 10);
-        nn_trainer.Train_k(100, 0.0009, 10);
-        nn_trainer.Train_k(100, 0.0008, 10);
-        nn_trainer.Train_k(100, 0.0005, 10);
-        
-        
-        /*
-        // Map input strength
-        ArrayList<double[]> inputStrength = nn_trainer.MapInputStrength();
-        
-        NumberFormat format3d = new DecimalFormat("#0.000");     
-
-        for(int c = 0; c < inputStrength.size(); c++)
-        {
-            for(int o = 0; o < outputSize; o++)
-            {
-                System.out.println(
-                        "Strength of input: " + tData.GetColumnNameByPosition(c) + 
-                                " is\t" + format3d.format(inputStrength.get(c)[o]) + " for output: " + 
-                                tData.GetColumnNameByPosition( predictors.get(o) ) 
-                );
-            }
-        }
-        */
-        
-        // Predict
-        ArrayList<ArrayList<Double>> columnPredictions = nn_trainer.Predict();
-        
-        for(int i = 0; i < columnPredictions.size(); i++)
-        {
-            Column_Number new_col = new Column_Number("" + tData.GetColumnNameByPosition( predictors.get(i) ) + ".predict" );
-            new_col.SetData( columnPredictions.get(i) );
-            
-            tData.AddColumn( new_col );
-        }
-        
-        // 
-        String[] lines = tData.ToCSVLines(null);
-        
-        String resultsFilename = "C:\\Docs\\Statfun\\poe.ninja\\currency.piv.all.res.csv";
-        CsvReader.WriteLines(resultsFilename, lines);
-    }
-    
-    public void TestKohonenMap( Table tData )
-    {
-        double learning_rate = 0.05;
-        double mse_delta_log_threshold = 3d;
-        int coop_radius = 3;
-        double rowCount_rate = 1.0;
-        
-        int duration_avg = 4;
-        
-        TestKohonenMap( tData, learning_rate, coop_radius, rowCount_rate, mse_delta_log_threshold, duration_avg);
-    }
-    
-    public void TestKohonenMap(Table tData, double learning_rate, int coop_radius, double rowCount_rate, double mse_delta_log_threshold, int duration_avg )
+    public void TestKohonenMap(Table tData )
     {
         SelfOrganizingMap_arr_hc_toroid missingInputPredictor = new SelfOrganizingMap_arr_hc_toroid( tData );
         missingInputPredictor.Initialize();

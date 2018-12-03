@@ -29,7 +29,7 @@ import java.util.Arrays;
 /**
  *
  */
-public class NeuralNetworl_feedforward_leakyReLu 
+public class NeuralNetwork_feedforward_leakyReLu 
 {
     int Input_height;
     int Matrix_height;
@@ -392,7 +392,7 @@ public class NeuralNetworl_feedforward_leakyReLu
             
             // Show progress
             if (rep % 50 == 0)
-                System.out.println( "\tlr: " + learning_rate + "\trep: " + rep + "\ttraining MSE: " + eSum );
+                System.out.println( "\tlr: " + learning_rate + "\trep: " + rep + "\ttraining MSE: " + eSum[0] + " " + eSum[1] );
             
         }
         

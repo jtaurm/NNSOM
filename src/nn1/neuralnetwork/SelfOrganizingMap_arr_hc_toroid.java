@@ -57,7 +57,7 @@ public class SelfOrganizingMap_arr_hc_toroid
     
     public void Initialize()
     {
-        double size = Math.pow( TrainingData.GetRowCount() * TrainingData.GetTableWidth(), 0.5d ) * 5d;
+        double size = Math.pow( TrainingData.GetRowCount() * TrainingData.GetTableWidth(), 0.5d ) * 5.0d;
         
         int outputsize = (int) Math.ceil( Math.pow( size, 0.5d ) );
         int inputwidth = (int) Math.ceil( Math.pow( size, 0.5d ) );
@@ -175,9 +175,9 @@ public class SelfOrganizingMap_arr_hc_toroid
         double mse_delta_log_threshold = 3.2d;
         int coop_radius = 3;
         double rowCount_rate = 0.90;
-        int min_rad_iteration = 50;
         
         int duration_avg = 10;
+        int min_rad_iteration = duration_avg * 2;
         
         return Train_Auto( learning_rate, coop_radius, rowCount_rate, mse_delta_log_threshold, min_rad_iteration, duration_avg, verbose);
     }
@@ -200,22 +200,30 @@ public class SelfOrganizingMap_arr_hc_toroid
         Double[][] trainingData = TrainingData.GetNormalizedDataSetAsArray_cr();
         
         int rowCount = TrainingData.GetRowCount();
-        int trainCount = 0;
+        int trainCount_radius = 0;
+        int trainCount_total = 0;
+        int trainCount_base = 1;
+        
+        int coop_radius_current = coop_radius;
         
         Double mse_avg_log;
+        Double mse_avg;
         Double mse_slope_log;
+        Double mse_slope;
     
         Double mse_delta_log;
         LinkedList<Double> mse_last = new LinkedList<>();
         double mse_final = 0d;
         
-        while( coop_radius >= 0)
+        while( coop_radius_current >= 0)
         {   // For each radius down to 0
             
             // Train
-            //mse_last.add( Train_CV(10, learning_rate, coop_radius ) );
-            mse_last.add( Train_MonteCarlo(trainingData, 1, rowCount, learning_rate, coop_radius ) );
-            trainCount += 1;
+            //mse_last.add( Train_MonteCarlo(trainingData, trainCount_base, rowCount, learning_rate, coop_radius ) );
+            mse_last.add( Train_SeededOrder(trainingData, trainCount_base, learning_rate, coop_radius_current, trainCount_total ) );
+            
+            trainCount_radius += trainCount_base;
+            trainCount_total += trainCount_base;
             
             if(verbose) System.out.print("|");
             
@@ -224,41 +232,40 @@ public class SelfOrganizingMap_arr_hc_toroid
             {
                 mse_last.removeFirst(); // Keep last [duration_avg+1] results
                 
-                mse_slope_log = 0d;
-                mse_avg_log = 0d;
-                
                 // Calc average and slope from results
+                mse_slope = 0d;
+                mse_avg = 0d;
+                
                 for( int m = 0; m < duration_avg; m++)
                 {
-                    mse_slope_log += mse_last.get(m) - mse_last.get(m+1);
-                    mse_avg_log += mse_last.get(m);
+                    mse_slope += mse_last.get(m) - mse_last.get(m+1);
+                    mse_avg += mse_last.get(m);
                 }
-                mse_slope_log = mse_slope_log / duration_avg;
-                mse_slope_log = Math.log10(mse_slope_log);
-                mse_avg_log = mse_avg_log / duration_avg;
-                mse_avg_log = Math.log10(mse_avg_log);
+                mse_slope = mse_slope / duration_avg;
+                mse_slope_log = (mse_slope < 0 ? Double.NEGATIVE_INFINITY : Math.log10(mse_slope) );
+                mse_avg = mse_avg / duration_avg;
+                mse_avg_log = (mse_avg < 0 ? Double.NEGATIVE_INFINITY : Math.log10(mse_avg) );
                 
-                // Calc relative improvement
+                // Calc relative improvement ( = -infinity if slope is not improving )
                 mse_delta_log = mse_avg_log - mse_slope_log;
                 
-                if(mse_delta_log > mse_delta_log_threshold && trainCount > min_rad_iteration)
+                if( mse_delta_log > mse_delta_log_threshold && trainCount_radius > min_rad_iteration)
                 {   // Improvement is too low
                     if(verbose) System.out.println();
-                    if(verbose) System.out.println("\tCoop radius: " + coop_radius + " Iterations: " + trainCount + "\tError " + format7d.format( Math.pow( 10, mse_avg_log ) ) );
+                    if(verbose) System.out.println("\tCoop radius: " + coop_radius_current + " Iterations: " + trainCount_radius + "\tError " + format7d.format( Math.pow( 10, mse_avg_log ) ) );
                     
                     // Reduce radius
-                    coop_radius--;
+                    coop_radius_current--;
                     
                     // clear vars
                     mse_final = mse_last.getLast();
                     mse_last.clear();
-                    trainCount = 0;
+                    trainCount_radius = 0;
                     
-                    if(coop_radius == 0) // clear for last round
+                    if(coop_radius_current == 0) // clear for last round
                         ResetHits();
                 }
             }
-            
             
         }
         
@@ -307,6 +314,35 @@ public class SelfOrganizingMap_arr_hc_toroid
         }
         
         return test_error / repCount;
+        
+    }
+    
+    public double Train_SeededOrder(Double[][] trainingData, int repCount, double learningRate, int coop_radius, int seed )
+    {
+        int row_count = TrainingData.GetRowCount();
+        seed = Math.max( seed % row_count, 1 );
+        
+        double training_error = 0d;
+        
+        for(int rep = 0; rep < repCount; rep++)
+        {
+            // Generate indices list
+            int[] idx_order = new int[row_count];
+            
+            int i = 0;
+            for(int s = 0; s < seed; s++)
+                for(int r = s; r < row_count; r += seed)
+                {
+                    idx_order[i] = r;
+                    i++;
+                }
+                    
+            // Train single session
+            // All data is passed through - only training error is available
+            training_error += Train_SingleSession( idx_order, learningRate, coop_radius, trainingData);
+        }
+        
+        return training_error / repCount;
         
     }
     

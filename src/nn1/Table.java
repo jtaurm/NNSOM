@@ -436,7 +436,9 @@ public class Table
         {
             // Initialize random vector of width: row count, length: 1
             for(int i = 0; i < scores.length; i++)
-                scores[i] = Math.random();
+                //scores[i] = Math.random();
+                //scores[i] = 0.5d;
+                scores[i] = GetCellValueNormalized( 0 , i );
 
             scores_len = 0;
             for (int c = 0; c < scores.length; c++)
