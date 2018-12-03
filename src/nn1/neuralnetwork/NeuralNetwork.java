@@ -151,6 +151,7 @@ public class NeuralNetwork
      * Log-based layer size. Each subsequent layer is the size of the previous layer / scaling.
      * @param inputSize
      * @param outputSize 
+     * @param scaling
      */
     public void SetupLogSize( int inputSize, int outputSize, double scaling )
     {

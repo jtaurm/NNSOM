@@ -205,7 +205,7 @@ public class Table
         return Column_list.get( ColumnIdx[0] ).NormalizeValue(avg);
     }
     
-    public Double[][] GetNormalizedDataSetAsArray()
+    public Double[][] GetNormalizedDataSetAsArray_cr()
     {
         Double[][] DataSet_Norm = new Double[TableWidth][GetRowCount()];
         
@@ -215,6 +215,27 @@ public class Table
             Column col = Column_list.get( ColumnIdx[0] );
             
             DataSet_Norm[c] = col.GetValues_Normalized( ColumnIdx[1] );
+        }
+        
+        return DataSet_Norm;
+    }
+    
+    public double[][] GetNormalizedDataSetAsArray_rc()
+    {
+        int row_count = GetRowCount();
+        double[][] DataSet_Norm = new double[row_count][TableWidth];
+        
+        for(int c = 0; c < TableWidth; c++)
+        {
+            Integer[] ColumnIdx = Columns_PosToIdx.get(c);
+            Column col = Column_list.get( ColumnIdx[0] );
+            
+            for(int r = 0; r < row_count; r++)
+            {
+                Double val = col.GetValue_Normalized( r, ColumnIdx[1] );
+                DataSet_Norm[r][c] = (val.isNaN() ? 0d : val);
+            }
+            
         }
         
         return DataSet_Norm;

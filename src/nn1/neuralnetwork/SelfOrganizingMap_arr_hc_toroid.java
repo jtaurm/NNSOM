@@ -197,7 +197,7 @@ public class SelfOrganizingMap_arr_hc_toroid
     {
         NumberFormat format7d = new DecimalFormat("#0.0000000");
         
-        Double[][] trainingData = TrainingData.GetNormalizedDataSetAsArray();
+        Double[][] trainingData = TrainingData.GetNormalizedDataSetAsArray_cr();
         
         int rowCount = TrainingData.GetRowCount();
         int trainCount = 0;

@@ -108,7 +108,69 @@ public class Nn1
         
         // Test NN
 
-        //TestNeuralNetwork( tData, predictors, columnIOMapping);
+        TestNeuralNetwork( tData, predictors, columnIOMapping);
+    }
+    
+    public void TestNeuralNetwork_new( Table tData, ArrayList<Integer> response_var_idx, int[] columnIOMapping  )
+    {
+        int inputSize = columnIOMapping.length - response_var_idx.size();
+        int outputSize = response_var_idx.size();
+        
+        double[][] training_data = tData.GetNormalizedDataSetAsArray_rc();
+        
+        NeuralNetworl_feedforward_leakyReLu nn_test = new NeuralNetworl_feedforward_leakyReLu();
+        
+        nn_test.Initialize(inputSize, outputSize, 16, 4);
+        
+        System.out.println("Created NN w " + "many" + " neurons.");
+        
+        System.out.println("Training NN");
+        for(double learning_rate = 0.1; learning_rate > 0.0005; learning_rate *= 1 / Math.E )
+            nn_test.Train(training_data, columnIOMapping, 100, learning_rate);
+         
+        // Predict
+        double[][] predictions = nn_test.Predict(training_data, columnIOMapping);
+        
+        for(int o = 0; o < outputSize; o++)
+        {
+            Column_Number new_col = new Column_Number("" + tData.GetColumnNameByPosition( response_var_idx.get(o) ) + ".predict" );
+            ArrayList<Double> predictions_asCol = new ArrayList<>();
+            
+            for(int r = 0; r < training_data.length; r++)
+                predictions_asCol.add(predictions[r][o]);
+            
+            new_col.SetData( predictions_asCol );
+            
+            tData.AddColumn( new_col );
+        }
+        
+        // 
+        String[] lines = tData.ToCSVLines(null);
+        String resultsFilename = "C:\\Docs\\Statfun\\poe.ninja\\currency.piv.all.res.csv";
+        CsvReader.WriteLines(resultsFilename, lines);
+        
+        /*
+        // Map input strength
+        ArrayList<double[]> inputStrength = nn_trainer.MapInputStrength();
+        
+        NumberFormat format3d = new DecimalFormat("#0.000");     
+
+        for(int c = 0; c < inputStrength.size(); c++)
+        {
+            for(int o = 0; o < outputSize; o++)
+            {
+                System.out.println(
+                        "Strength of input: " + tData.GetColumnNameByPosition(c) + 
+                                " is\t" + format3d.format(inputStrength.get(c)[o]) + " for output: " + 
+                                tData.GetColumnNameByPosition( predictors.get(o) ) 
+                );
+            }
+        }
+        */
+        
+        
+        
+        
     }
     
     public void TestNeuralNetwork( Table tData, ArrayList<Integer> predictors, int[] columnIOMapping  )
