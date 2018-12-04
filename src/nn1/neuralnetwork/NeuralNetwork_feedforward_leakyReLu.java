@@ -411,7 +411,14 @@ public class NeuralNetwork_feedforward_leakyReLu
                 Axon_input_weights[h_i][h_n] += Axon_input_descent[h_i][h_n] * learning_rate;
     }
     
-    public double[] Train(double[][] training_data, int[] ColumnIOMap, double learning_rate, boolean monte_carlo, boolean batch_mode)
+    public enum TrainingMethod
+    {
+        Basic, MonteCarlo, SeedPermutation
+    }
+    
+    int TrainingCount = 0;
+    
+    public double[] Train(double[][] training_data, int[] ColumnIOMap, double learning_rate, TrainingMethod method, boolean batch_mode)
     {
         int rowCount = training_data.length;
         
@@ -435,7 +442,7 @@ public class NeuralNetwork_feedforward_leakyReLu
             idx_order[i] = i;
 
         // Randomize indices list
-        if(monte_carlo)
+        if(method == TrainingMethod.MonteCarlo)
             for(int i = 0; i < rowCount; i++)
             {
                 int p = (int) (Math.random() * rowCount);
@@ -443,6 +450,16 @@ public class NeuralNetwork_feedforward_leakyReLu
                 idx_order[i] = idx_order[p];
                 idx_order[p] = swap;
             }
+        else if(method == TrainingMethod.SeedPermutation)
+        {
+            int i = 0, seed = Math.max( 1, (TrainingCount + 1) % (training_data.length - 1) );
+            for(int s = 0; s < seed; s++)
+                for(int r = s; r < training_data.length; r += seed)
+                {
+                    idx_order[i] = r;
+                    i++;
+                }
+        }
 
         // Run through data set / table
         for(int r = 0; r < rowCount; r++)
@@ -510,6 +527,7 @@ public class NeuralNetwork_feedforward_leakyReLu
             eSum[outputIdx] = eSum[outputIdx] / Errors.size();
 
         Errors.clear();
+        TrainingCount++;
         
         return eSum;
         

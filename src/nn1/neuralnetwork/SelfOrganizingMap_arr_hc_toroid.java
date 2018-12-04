@@ -597,7 +597,7 @@ public class SelfOrganizingMap_arr_hc_toroid
         line.append( TrainingData.GetColumnNameByPosition(position1) );
         line.append( "\",\"" );
         line.append( TrainingData.GetColumnNameByPosition(position2) );
-        line.append( "\",Hits" );
+        line.append( "\",Hits,x,y" );
         
         lines[0] = line.toString();
         
@@ -618,6 +618,10 @@ public class SelfOrganizingMap_arr_hc_toroid
                 line.append( Neuron_matrix_weights[w][h][position2] );
                 line.append( "," );
                 line.append( Neuron_matrix_hits[w][h] );
+                line.append( "," );
+                line.append( w );
+                line.append( "," );
+                line.append( h );
 
                 lines[neuronCount + 1] = line.toString();
                 neuronCount++;
