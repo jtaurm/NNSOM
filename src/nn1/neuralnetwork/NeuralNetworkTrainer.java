@@ -95,13 +95,15 @@ public class NeuralNetworkTrainer
         
     }
     
-    public void Train(int repCount, double learningRate)
+    public double Train(int repCount, double learningRate)
     {
         int rowCount = TrainingData.GetRowCount();
         ArrayList<Neuron> OutputNeurons = LearningMachine.GetOutputNeurons();
         
         ArrayList<Double[]> Errors = new ArrayList<>();
         ArrayList<Double[]> Predictions = new ArrayList<>();
+        
+        Double eSum = 0d;
         
         // for each repeatition of data set
         for(int reps = 0; reps < repCount; reps++)
@@ -153,8 +155,8 @@ public class NeuralNetworkTrainer
                 {
                     Neuron o = OutputNeurons.get(outputIdx);
 
-                    if( outputIdx == 1 && response[outputIdx].isNaN() ) // Fix NaN for exalted shards
-                        response[1] = response[0];
+                    //if( outputIdx == 1 && response[outputIdx].isNaN() ) // Fix NaN for exalted shards
+                    //    response[1] = response[0];
                     
                     // Collect activity
                     predictions[outputIdx] = o.GetActivity();
@@ -171,7 +173,7 @@ public class NeuralNetworkTrainer
             }
             
             // Calc training MSE
-            Double eSum = 0d;
+            eSum = 0d;
             int eCount = 0;
             for(Double[] e: Errors)
             {
@@ -186,10 +188,11 @@ public class NeuralNetworkTrainer
             Errors.clear();
             Predictions.clear();
             
-            if (reps % 50 == 0)
-                System.out.println( "\tlr: " + learningRate+ "\trep: " + reps + "\ttraining MSE: " + eSum );
+            //if (reps % 50 == 0) System.out.println( "\tlr: " + learningRate+ "\trep: " + reps + "\ttraining MSE: " + eSum );
             
         }
+        
+        return eSum;
     }
     
     public void Train_k(int repCount, double learningRate, int k)
