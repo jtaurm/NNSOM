@@ -29,6 +29,7 @@ import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Comparator;
 
 /**
  *
@@ -169,6 +170,8 @@ public class Column_DateTime extends Column
     Double Stat_norm_var;
     int Stat_nonNa_cnt;
     
+    int[] SortIndex;
+    
     @Override
     public final void Compile()
     {
@@ -238,6 +241,21 @@ public class Column_DateTime extends Column
             }
         }
         Stat_norm_var = Stat_norm_var / Stat_nonNa_cnt;
+        
+        // Build sort index
+        SortIndex = new int[DataAsDouble.size()];
+        Integer[] SortIndexObj = new Integer[DataAsDouble.size()];
+        for(int i = 0; i < DataAsDouble.size(); i++)
+            SortIndexObj[i] = i;
+        
+        Arrays.sort( SortIndexObj, new Comparator<Integer>() {
+            public int compare(Integer o1, Integer o2) {
+                return DataAsDouble.get(o1).compareTo( DataAsDouble.get(o2) );
+            }
+        });
+        
+        for(int i = 0; i < DataAsDouble.size(); i++)
+            SortIndex[i] = SortIndexObj[i];
     }
     
     @Override
@@ -363,6 +381,18 @@ public class Column_DateTime extends Column
     {
         // Does var scale???
         return DenormalizeValue(Stat_norm_var);
+    }
+    
+    @Override 
+    public int GetRowIndex_NormalizedSorted(int order, int position)
+    {
+        return SortIndex[order];
+    }
+    
+    @Override
+    public int GetRowIndex_Median(int position)
+    {
+        return (int) Math.floor( (double) DataAsDouble.size() * 0.5 );
     }
     
     @Override

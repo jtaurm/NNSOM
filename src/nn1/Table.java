@@ -205,6 +205,12 @@ public class Table
         return Column_list.get( ColumnIdx[0] ).NormalizeValue(avg);
     }
     
+    public int GetColumnMedianOrderIndex(int position)
+    {
+        Integer[] ColumnIdx = Columns_PosToIdx.get(position);
+        return Column_list.get( ColumnIdx[0] ).GetRowIndex_Median( ColumnIdx[1] );
+    }
+    
     public Double[][] GetNormalizedDataSetAsArray_cr()
     {
         Double[][] DataSet_Norm = new Double[TableWidth][GetRowCount()];

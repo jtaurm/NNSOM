@@ -25,6 +25,7 @@ package nn1;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.Iterator;
 
@@ -150,6 +151,8 @@ public class Column_Levels extends Column
     Double[] Stat_avg;
     Double[] Stat_var;
     
+    int[][] SortIndex;
+    
     @Override
     public final void Compile()
     {
@@ -207,18 +210,42 @@ public class Column_Levels extends Column
         {
             Stat_var[p] = Stat_var[p] / DataAsBools.size();
         }
+        
+        // Build sort index
+        SortIndex = new int[LevelValues.length][DataAsDouble.size()];
+        
+        Integer[][] SortIndexObj = new Integer[LevelValues.length][DataAsDouble.size()];
+        for(int l = 0; l < LevelValues.length; l++)
+            for(int i = 0; i < DataAsDouble.size(); i++)
+                SortIndexObj[l][i] = i;
+        
+        for(int l = 0; l < LevelValues.length; l++)
+        {
+            int level = l;
+            Arrays.sort(SortIndexObj[level], (Integer o1, Integer o2) -> DataAsDouble.get(o1)[level].compareTo( DataAsDouble.get(o2)[level] ));
+            
+            for(int i = 0; i < DataAsDouble.size(); i++)
+                SortIndex[l][i] = SortIndexObj[l][i];
+        }
+        
+        BooleanMedians = new int[LevelValues.length];
+        
+        for(int l = 0; l < LevelValues.length; l++)
+        {
+            BooleanMedians[l] = 1 + DataAsDouble.size() - ((int) (Stat_avg[l] * (double) DataAsDouble.size()));
+        }
+        
     }
+    
+    private int[] BooleanMedians;
     
     @Override
     public void SetValue_Numeric(int row, int position, Double value_new )
     {
         Double value_old = DataAsDouble.get(row)[position];
-        Double value_old_norm = value_old;
         
         if( !value_old.equals(value_new))
         {   // old != new
-            double value_new_norm = value_new;
-            
             DataAsDouble.get(row)[position] = value_new;
             
             Stat_avg[position] = ((Stat_avg[position] * DataAsBools.size()) + (value_new - value_old) ) / (DataAsBools.size());
@@ -286,6 +313,18 @@ public class Column_Levels extends Column
     {
         // Does var scale???
         return Stat_var[position];
+    }
+    
+    @Override 
+    public int GetRowIndex_NormalizedSorted(int order, int position)
+    {
+        return SortIndex[position][order];
+    }
+    
+    @Override
+    public int GetRowIndex_Median(int position)
+    {
+        return BooleanMedians[position];
     }
     
     @Override
