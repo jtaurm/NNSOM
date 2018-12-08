@@ -28,6 +28,9 @@ import java.text.NumberFormat;
 import java.util.LinkedList;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Formatter;
+import java.util.TreeSet;
+import nn1.RTree_3d_ref;
 
 /**
  *
@@ -109,6 +112,50 @@ public class SelfOrganizingMap_arr_hc_toroid
                 neuronCount++;
             }
         }
+        
+        
+        RTree_3d_ref RTree = new RTree_3d_ref( Neuron_matrix_weights );
+        for(int h = 0; h < height; h++)
+        {
+            for(int w = 0; w < width; w++)
+            {
+                RTree.Insert(w, h);
+            }
+            
+        }
+        
+        double[] pp = new double[Neuron_matrix_depth];
+        Double[] p = new Double[Neuron_matrix_depth];
+        for(int i = 0; i < Neuron_matrix_depth; i++)
+        {
+            p[i] = Math.random();
+            pp[i] = p[i];
+        }
+        
+        double dist = 0d;
+        
+        
+        System.out.println( "\tpp: " + p[0] );
+        
+        int[] c = FindBestMatchingUnit( p );
+        
+        dist = 0d;
+        for(int i = 0; i < Neuron_matrix_depth; i++)
+            dist += Math.pow( Neuron_matrix_weights[c[0]][c[1]][i] - p[i], 2);
+        dist = Math.pow(dist, 0.5d);
+        
+        System.out.println( "\tfBMU: " + c[0] + "," + c[1] + "\t" + dist );
+        
+        c = RTree.FindNearestNeighbour( pp );
+        
+        dist = 0d;
+        for(int i = 0; i < Neuron_matrix_depth; i++)
+            dist += Math.pow( Neuron_matrix_weights[c[0]][c[1]][i] - p[i], 2);
+        dist = Math.pow(dist, 0.5d);
+        
+        System.out.println( "\tR.fNN: " + c[0] + "," + c[1] + "\t" + dist );        
+        
+        RTree.PrintAll(pp);
         
         System.out.println("Created SOM w " + neuronCount + " neurons. Initialized from PC1 and PC2 with " + Neuron_matrix_depth + " dimension.");
     }
@@ -637,400 +684,7 @@ public class SelfOrganizingMap_arr_hc_toroid
     }
     
     //</editor-fold>
-    //<editor-fold defaultstate="collapsed" desc="Data structure -- Bounding Box">
     
-    private abstract class BoundingBox
-    {
-        protected double[] Point_CornerFirst;
-        protected double[] Point_CornerLast;
-     
-        BoundingBoxNode ParentBox;
-        double[][][] PointMatrix;
-        
-        int Capacity_min = 2;
-        int Capacity_max = 10;
-        
-        int Dimensions;
-        
-        public boolean EnclosesItem( double[] item )
-        {
-            for(int a = 0; a < Point_CornerFirst.length; a++)
-                if( Point_CornerFirst[a] > item[a] || Point_CornerLast[a] < item[a] )
-                    return false;
-            
-            return true;
-        }
-        
-        public double GetHyperVolume()
-        {
-            double hyper_vol = 0d;
-            for(int a = 0; a < Point_CornerFirst.length; a++)
-            {
-                hyper_vol += Math.log10(Point_CornerLast[a] - Point_CornerFirst[a]);
-            }
-            return hyper_vol;
-        }
-        
-        public double GetHyperVolume( double[] item )
-        {
-            double hyper_vol = 0d;
-            for(int a = 0; a < Point_CornerFirst.length; a++)
-            {
-                if( Point_CornerFirst[a] > item[a])
-                    hyper_vol += Math.log10( Point_CornerLast[a] - item[a] );
-                else if(Point_CornerLast[a] < item[a] )
-                    hyper_vol += Math.log10( item[a] - Point_CornerFirst[a] );
-                else
-                    hyper_vol += Math.log10( Point_CornerLast[a] - Point_CornerFirst[a] );
-            }
-            return hyper_vol;
-        }
-        
-        public double GetHyperVolume( BoundingBox box )
-        {
-            double hyper_vol = 0d;
-            for(int a = 0; a < Point_CornerFirst.length; a++)
-            {
-                if( Point_CornerFirst[a] < box.Point_CornerFirst[a])
-                    if( Point_CornerLast[a] > box.Point_CornerLast[a])
-                        hyper_vol += Math.log10( (Point_CornerLast[a] - Point_CornerFirst[a]) );
-                    else
-                        hyper_vol += Math.log10( ( box.Point_CornerLast[a] - Point_CornerFirst[a]) );
-                else
-                    if( Point_CornerLast[a] > box.Point_CornerLast[a])
-                        hyper_vol += Math.log10( ( Point_CornerLast[a] - box.Point_CornerFirst[a]) );
-                    else
-                        hyper_vol += Math.log10( ( box.Point_CornerLast[a] - box.Point_CornerFirst[a]) );
-            }
-            return 2 * hyper_vol;
-        }
-        
-        public double DistanceFromCenterSquared( double[] item )
-        {
-            double distance = 0d;
-            for(int a = 0; a < Point_CornerFirst.length; a++)
-            {
-                distance += Math.pow( item[a] - (Point_CornerFirst[a] + (Point_CornerLast[a] - Point_CornerFirst[a]) * 0.5d), 2);
-            }
-            return distance;
-        }
-        
-        public void ExpandBoxToFit( double[] item )
-        {
-            for(int a = 0; a < Point_CornerFirst.length; a++)
-            {
-                if( Point_CornerFirst[a] > item[a])
-                    Point_CornerFirst[a] = item[a];
-            
-                if(Point_CornerLast[a] < item[a] )
-                    Point_CornerLast[a] = item[a];
-            }
-        }
-        
-        abstract void InsertPoint( int x, int y);
-        abstract void Split();
-    }
-    
-    private class BoundingBoxNode extends BoundingBox
-    {
-        ArrayList<BoundingBox> Items;
-                
-        public BoundingBoxNode( double[][][] points, BoundingBoxNode parent, BoundingBox firstBox )
-        {
-            PointMatrix = points;
-            Items = new ArrayList<>();
-            ParentBox = parent;
-            Dimensions = points[0][0].length;
-            
-            for(int a = 0; a < Point_CornerFirst.length; a++)
-            {
-                Point_CornerFirst[a] = firstBox.Point_CornerFirst[a];
-                Point_CornerLast[a] = firstBox.Point_CornerLast[a];
-            }
-                        
-            Items.add( firstBox );
-        }
-        
-        @Override
-        public void InsertPoint( int x, int y )
-        {
-            // Expand box
-            ExpandBoxToFit( PointMatrix[x][y] );
-            
-            // Search sub-box'es
-            for(int i = 0; i < Items.size(); i++)
-            {
-                if( Items.get(i).EnclosesItem( PointMatrix[x][y] ) )
-                {
-                    Items.get(i).InsertPoint(x, y);
-                    return;
-                }
-            }
-            
-            // No box encloses point
-            // Find one to expand
-            BoundingBox bestBox = Items.get(0);
-            double best_volume = bestBox.GetHyperVolume( PointMatrix[x][y] );
-            
-            for(int i = 1; i < Items.size(); i++)
-            {
-                double volume = Items.get(i).GetHyperVolume( PointMatrix[x][y] );
-                if( volume < best_volume )
-                {
-                    best_volume = volume;
-                    bestBox = Items.get(i);
-                }
-            }
-            
-            // Insert item
-            bestBox.InsertPoint(x, y);
-        }
-        
-        public void InsertBox_external( BoundingBox box )
-        {
-            Items.add(box);
-            
-            for(int a = 0; a < Point_CornerFirst.length; a++)
-            {
-                if(Point_CornerFirst[a] > box.Point_CornerFirst[a])
-                    Point_CornerFirst[a] = box.Point_CornerFirst[a];
-                if(Point_CornerLast[a] < box.Point_CornerLast[a])
-                    Point_CornerLast[a] = box.Point_CornerLast[a];
-            }
-            
-            if(Items.size() > Capacity_max)
-                Split();
-        }
-                
-        public void InsertBox_internal( BoundingBox box )
-        {
-            Items.add(box);
-            
-            if(Items.size() > Capacity_max)
-                Split();
-        }
-        
-        @Override
-        public void Split()
-        {
-            int items_size = Items.size();
-            
-            double hypervol;
-            double best_volumne = Double.MAX_VALUE;
-            int best_volume_i = 0;
-            int best_volume_j = 0;
-            
-            // Find lowest vol
-            for( int i = 0; i < items_size; i++)
-                for( int j = i; j < items_size; j++)
-                {
-                    hypervol = Items.get(i).GetHyperVolume( Items.get(j) );
-                    if(hypervol < best_volumne)
-                    {
-                        best_volumne = hypervol;
-                        best_volume_i = i;
-                        best_volume_j = j;
-                    }
-                }
-            
-            // Ready the split
-            ArrayList<BoundingBox> items_split = new ArrayList<>();
-            items_split.addAll(Items);
-            
-            // Create new box
-            BoundingBoxNode box1 = new BoundingBoxNode( PointMatrix, ParentBox, Items.get(best_volume_i)  );
-            
-            // Reset this box
-            BoundingBoxNode box2 = this;
-            
-            for(int a = 0; a < Point_CornerFirst.length; a++)
-            {
-                Point_CornerFirst[a] = Items.get(best_volume_j).Point_CornerFirst[a];
-                Point_CornerLast[a] = Items.get(best_volume_j).Point_CornerLast[a];
-            }
-            
-            Items.clear();
-            Items.add( Items.get(best_volume_j) );
-            
-            // Remove the two initial boxes from the list
-            if(best_volume_i > best_volume_j)
-            {
-                items_split.remove(best_volume_j);
-                items_split.remove(best_volume_i);
-            }
-            else
-            {
-                items_split.remove(best_volume_i);
-                items_split.remove(best_volume_j);
-            }
-            
-            // distribute the remaining boxes
-            for(int i = 0; i < items_split.size(); i++ )
-            {
-                BoundingBox item = items_split.get(i);
-
-                if( box1.GetHyperVolume( item ) > box2.GetHyperVolume( item ) )
-                    box2.InsertBox_external(item );
-                else
-                    box1.InsertBox_external( item );
-
-            }
-            
-            // Notify parent of split
-            ParentBox.InsertBox_internal(box1);
-        }
-        
-        
-    }
-    
-    private class BoundingBoxLeaf extends BoundingBox
-    {
-        ArrayList<int[]> Items; 
-        
-        public BoundingBoxLeaf( double[][][] points, BoundingBoxNode parent, int item_x, int item_y )
-        {
-            ParentBox = parent;
-            PointMatrix = points;
-            Items = new ArrayList<>();
-            Dimensions = points[0][0].length;
-            
-            for(int a = 0; a < Point_CornerFirst.length; a++)
-            {
-                Point_CornerFirst[a] = PointMatrix[item_x][item_y][a];
-                Point_CornerLast[a] = PointMatrix[item_x][item_y][a];
-            }
-                        
-            Items.add( new int[]{ item_x, item_y } );
-        }
-        
-        @Override
-        public void InsertPoint( int x, int y )
-        {
-            // Expand box
-            ExpandBoxToFit( PointMatrix[x][y] );
-            
-            // Add item
-            Items.add( new int[] { x, y } );
-            
-            // Check for split
-            if( Items.size() > Capacity_max)
-                Split();
-        }
-        
-        public void RemovePoint( int x, int y )
-        {
-            // Remove from list
-            for(int i = 0; i < Items.size(); i++)
-                if( Items.get(i)[0] == x && Items.get(i)[1] == y )
-                {
-                    Items.remove(i);
-                    break;
-                }
-            
-            // Recalculate corners
-            for(int a = 0; a < Dimensions; a++)
-            {
-                //Point_CornerFirst[a] = PointMatrix[item_x][item_y][a];
-                //Point_CornerLast[a] = PointMatrix[item_x][item_y][a];
-                ;
-            }
-        }
-        
-        @Override
-        public void Split()
-        {
-            double[][] distance_matrix = new double[Capacity_max + 1][Capacity_max + 1];
-            double distance;
-            
-            // Fill distance matrix
-            for( int i = 0; i < Capacity_max + 1; i++)
-            {
-                for( int j = i; j < Capacity_max + 1; j++)
-                {
-                    distance = 0d;
-                    double[] point1 = PointMatrix[ Items.get(i)[0] ][ Items.get(i)[1] ];
-                    double[] point2 = PointMatrix[ Items.get(j)[0] ][ Items.get(j)[1] ];
-                    
-                    for(int a = 0; a < Dimensions; a++)
-                    {
-                        distance += (point1[a] - point2[a]) * (point1[a] - point2[a]);
-                    }
-                    
-                    distance_matrix[i][j] = distance;
-                }
-            }
-            
-            // Find highest distance points
-            double best_distance = distance_matrix[0][0];
-            int best_distance_i = 0;
-            int best_distance_j = 0;
-            
-            for( int i = 0; i < Capacity_max + 1; i++)
-            {
-                for( int j = i; j < Capacity_max + 1; j++)
-                {
-                    if( best_distance < distance_matrix[i][j])
-                    {
-                        best_distance_i = i;
-                        best_distance_j = j;
-                        best_distance = distance_matrix[i][j];
-                    }
-                }
-            }
-            
-            // Ready the split
-            ArrayList<int[]> items_split = new ArrayList<>();
-            items_split.addAll(Items);
-            
-            int point1_x = items_split.get(best_distance_i)[0];
-            int point1_y = items_split.get(best_distance_i)[1];
-            int point2_x = items_split.get(best_distance_j)[0];
-            int point2_y = items_split.get(best_distance_j)[1];
-            
-            if(best_distance_i > best_distance_j)
-            {
-                items_split.remove(best_distance_j);
-                items_split.remove(best_distance_i);
-            }
-            else
-            {
-                items_split.remove(best_distance_i);
-                items_split.remove(best_distance_j);
-            }
-            
-            // Create new box
-            BoundingBoxLeaf box1 = new BoundingBoxLeaf( PointMatrix, ParentBox, point1_x, point1_y );
-            
-            // Reset this box
-            BoundingBoxLeaf box2 = this;
-            
-            for(int a = 0; a < Point_CornerFirst.length; a++)
-            {
-                Point_CornerFirst[a] = PointMatrix[ point2_x ][ point2_y ][a];
-                Point_CornerLast[a] = PointMatrix[ point2_x ][ point2_y ][a];
-            }
-            
-            Items.clear();
-            Items.add( new int[]{ point2_x, point2_y } );
-            
-            // Add items to the new boxes
-            for(int i = 0; i < items_split.size(); i++ )
-            {
-                int[] item = items_split.get(i);
-                double[] point = PointMatrix[ item[0] ][ item[1] ];
-                
-                if( box1.GetHyperVolume( point ) > box2.GetHyperVolume( point ) )
-                    box2.InsertPoint( item[0], item[0] );
-                else
-                    box1.InsertPoint( item[0], item[0] );
-
-            }
-            
-            // Notify parent of split
-            ParentBox.InsertBox_internal(box1);
-        }
-        
-    }
     
     
     //</editor-fold>
